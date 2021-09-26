@@ -32,8 +32,8 @@ async def daidaoLogin(bot, ev: CQEvent):
             uid = int(m.data['qq'])
             if uid in status:
                 at = str(MessageSegment.at(status[uid]))
-                msg = f'{at}正在代刀, 请勿上号!'
-                await bot.send(ev, msg)
+                msg = f'请勿上号!{at}正在代刀'
+                await bot.send(ev, msg, at_sender = True)
             else:
                 status[uid] = sender
                 await bot.send(ev, "可以上号，已记录代刀", at_sender=True)
