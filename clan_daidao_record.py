@@ -1,12 +1,15 @@
 import hoshino
 import re
-from datetime import timedelta
+from datetime import datetime
 from hoshino import Service, priv
 from hoshino.typing import *
 
 sv = Service('clan_daidao_record')
 
 status = dict() #{int:int}
+
+xiashu_boss = 0
+xiashu_time = ""
 
 @sv.on_fullmatch('代刀帮助')
 async def daidaoHelp(bot, ev: CQEvent):
@@ -21,6 +24,11 @@ async def daidaoHelp(bot, ev: CQEvent):
 清除代刀  [删除自己的代刀状态]
 删除代刀@User  [删除指定刀手的所有代刀状态 | 仅@单个对象 | 需管理权限]
 重置代刀  [删除所有代刀状态 | 需管理权限]
+
+**新增**
+下树[1-5] [通知所有人某Boss可以下树 | 需管理权限]
+下树？    [查询最近的下树通知]
+重置下树  [取消下树通知]
 '''
     await bot.send(ev, helpMessage)
 
@@ -150,3 +158,123 @@ async def daidaoclear(bot, ev: CQEvent):
     global status
     status = {}
     await bot.send(ev, "已重置代刀记录")
+
+@sv.on_fullmatch('下树')
+async def xiashuHelp(bot, ev: CQEvent):
+    helpMessage = '''请按以下格式发送下树指令：
+下树[1-5] [通知所有人某Boss可以下树 | 需管理权限]
+下树？    [查询最近的下树通知]
+重置下树  [取消下树通知]
+'''
+    await bot.send(ev, helpMessage)
+
+@sv.on_fullmatch('下树1')
+async def xiashu1(bot, ev: CQEvent):
+    u_priv = priv.get_user_priv(ev)
+    if u_priv < priv.ADMIN:
+        await bot.send(ev, "权限不足")
+        return
+    
+    global xiashu_boss
+    xiashu_boss = 1
+    global xiashu_time
+    xiashu_time = datetime.now().strftime("%w/%d %I:%M%p")
+    
+    msg = '''**********
+*一王下树*
+**********'''
+    await bot.send(ev, msg)
+
+@sv.on_fullmatch('下树2')
+async def xiashu2(bot, ev: CQEvent):
+    u_priv = priv.get_user_priv(ev)
+    if u_priv < priv.ADMIN:
+        await bot.send(ev, "权限不足")
+        return
+    
+    global xiashu_boss
+    xiashu_boss = 2
+    global xiashu_time
+    xiashu_time = datetime.now().strftime("%w/%d %I:%M%p")
+    
+    msg = '''**********
+*二王下树*
+**********'''
+    await bot.send(ev, msg)
+
+@sv.on_fullmatch('下树3')
+async def xiashu3(bot, ev: CQEvent):
+    u_priv = priv.get_user_priv(ev)
+    if u_priv < priv.ADMIN:
+        await bot.send(ev, "权限不足")
+        return
+    
+    global xiashu_boss
+    xiashu_boss = 3
+    global xiashu_time
+    xiashu_time = datetime.now().strftime("%w/%d %I:%M%p")
+    
+    msg = '''**********
+*三王下树*
+**********'''
+    await bot.send(ev, msg)
+
+@sv.on_fullmatch('下树4')
+async def xiashu4(bot, ev: CQEvent):
+    u_priv = priv.get_user_priv(ev)
+    if u_priv < priv.ADMIN:
+        await bot.send(ev, "权限不足")
+        return
+    
+    global xiashu_boss
+    xiashu_boss = 4
+    global xiashu_time
+    xiashu_time = datetime.now().strftime("%w/%d %I:%M%p")
+    
+    msg = '''**********
+*四王下树*
+**********'''
+    await bot.send(ev, msg)
+
+@sv.on_fullmatch('下树5')
+async def xiashu5(bot, ev: CQEvent):
+    u_priv = priv.get_user_priv(ev)
+    if u_priv < priv.ADMIN:
+        await bot.send(ev, "权限不足")
+        return
+    
+    global xiashu_boss
+    xiashu_boss = 5
+    global xiashu_time
+    xiashu_time = datetime.now().strftime("%w/%d %I:%M%p")
+    
+    msg = '''**********
+*五王下树*
+**********'''
+    await bot.send(ev, msg)
+
+@sv.on_fullmatch('下树？')
+@sv.on_fullmatch('下树?')
+async def xiashuCheck(bot, ev: CQEvent):
+    msg = ""
+    
+    if xiashu_boss == 0:
+        msg = "无下树通知记录"
+    else:
+        msg = "最近的下树通知为：{}王\n通知时间：{}".format(xiashu_boss, xiashu_time)
+    
+    await bot.send(ev, msg)
+
+@sv.on_fullmatch('重置下树')
+async def xiashuClear(bot, ev: CQEvent):
+    u_priv = priv.get_user_priv(ev)
+    if u_priv < priv.ADMIN:
+        await bot.send(ev, "权限不足")
+        return
+    
+    global xiashu_boss
+    xiashu_boss = 0
+    global xiashu_time
+    xiashu_time = ""
+    
+    await bot.send(ev, "下树通知/记录已清除")
