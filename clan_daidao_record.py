@@ -180,9 +180,9 @@ async def xiashu1(bot, ev: CQEvent):
     global xiashu_time
     xiashu_time = datetime.now().strftime("%m/%d %I:%M%p")
     
-    msg = '''***********
-**一王下树**
-***********'''
+    msg = '''************
+**1王下树**
+************'''
     await bot.send(ev, msg)
 
 @sv.on_fullmatch('下树2')
@@ -197,9 +197,9 @@ async def xiashu2(bot, ev: CQEvent):
     global xiashu_time
     xiashu_time = datetime.now().strftime("%m/%d %I:%M%p")
     
-    msg = '''***********
-**二王下树**
-***********'''
+    msg = '''************
+**2王下树**
+************'''
     await bot.send(ev, msg)
 
 @sv.on_fullmatch('下树3')
@@ -214,9 +214,9 @@ async def xiashu3(bot, ev: CQEvent):
     global xiashu_time
     xiashu_time = datetime.now().strftime("%m/%d %I:%M%p")
     
-    msg = '''***********
-**三王下树**
-***********'''
+    msg = '''************
+**3王下树**
+************'''
     await bot.send(ev, msg)
 
 @sv.on_fullmatch('下树4')
@@ -231,9 +231,9 @@ async def xiashu4(bot, ev: CQEvent):
     global xiashu_time
     xiashu_time = datetime.now().strftime("%m/%d %I:%M%p")
     
-    msg = '''***********
-**四王下树**
-***********'''
+    msg = '''************
+**4王下树**
+************'''
     await bot.send(ev, msg)
 
 @sv.on_fullmatch('下树5')
@@ -248,9 +248,9 @@ async def xiashu5(bot, ev: CQEvent):
     global xiashu_time
     xiashu_time = datetime.now().strftime("%m/%d %I:%M%p")
     
-    msg = '''***********
-**五王下树**
-***********'''
+    msg = '''************
+**5王下树**
+************'''
     await bot.send(ev, msg)
 
 @sv.on_fullmatch('下树？')
