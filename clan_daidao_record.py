@@ -1,15 +1,10 @@
 import hoshino
-import re
-from datetime import datetime
 from hoshino import Service, priv
 from hoshino.typing import *
+from datetime import datetime, timedelta
+from . import status
 
 sv = Service('clan_daidao_record')
-
-status = dict() #{int:int}
-
-xiashu_boss = 0
-xiashu_time = ""
 
 @sv.on_fullmatch('代刀帮助')
 async def daidaoHelp(bot, ev: CQEvent):
@@ -22,76 +17,84 @@ async def daidaoHelp(bot, ev: CQEvent):
 所有代刀  [查询所有代刀状态]
 
 清除代刀  [删除自己的代刀状态]
-删除代刀@User  [删除指定刀手的所有代刀状态 | 仅@单个对象 | 需管理权限]
-重置代刀  [删除所有代刀状态 | 需管理权限]
+删除代刀@User  [删除指定刀手的所有代刀状态 | 仅@单个对象 | 需要管理权限]
+重置代刀  [删除所有代刀状态 | 需要管理权限]
 
 **新增**
-下树[1-5] [通知所有人某Boss可以下树 | 需管理权限]
-下树？    [查询最近的下树通知]
-重置下树  [取消下树通知]
+代刀次数(@User): yy-mm-dd: h+d [查询指定用户（不指定则为自己）在指定时间段内的代刀次数 | 可@多个对象 | 例：代刀次数: 22-3-1: 18+4 （3月1日晚上6点到10点 自己的代刀次数）]
+删除历史: yy-mm-dd [删除指定日期之前的所有历史记录 | 需要管理权限]
+
+--移除--
+下树通知
 '''
     await bot.send(ev, helpMessage)
 
 @sv.on_prefix('上号')
 async def daidaoLogin(bot, ev: CQEvent):
-    sender = int(ev.user_id)
+    con = status.connect(str(ev.group_id))
+    sender = str(ev.user_id)
     for m in ev.message:
         if m.type == 'at' and m.data['qq'] != 'all':
-            uid = int(m.data['qq'])
-            if uid in status:
-                if status[uid] == sender:
+            uid = str(m.data['qq'])
+            curLoggedin = status.loginStatus(con, uid)
+            if curLoggedin is not None:
+                if curLoggedin == sender:
                     msg = '您已经在此账号上'
                 else:
-                    at = str(MessageSegment.at(status[uid]))
-                    msg = f'\n※※※※※请勿上号!※※※※※\n※※※※※请勿上号!※※※※※\n※※※※※请勿上号!※※※※※\n{at}正在代刀'
+                    at = str(MessageSegment.at(curLoggedin))
+                    msg = '\n※※※※※请勿上号!※※※※※\n※※※※※请勿上号!※※※※※\n※※※※※请勿上号!※※※※※\n{}正在代刀'.format(at)
                 await bot.send(ev, msg, at_sender = True)
             else:
-                status[uid] = sender
-                await bot.send(ev, "可以上号，已记录代刀", at_sender=True)
+                status.login(con, sender, uid)
+                await bot.send(ev, '可以上号，已记录代刀', at_sender=True)
+    con.close()
 
 @sv.on_prefix('下号')
 async def daidaoLogout(bot, ev: CQEvent):
-    sender = int(ev.user_id)
+    con = status.connect(str(ev.group_id))
+    sender = str(ev.user_id)
     for m in ev.message:
         if m.type == 'at' and m.data['qq'] != 'all':
-            uid = int(m.data['qq'])
-            if not uid in status:
-                await bot.send(ev, "该账号没有代刀", at_sender=True)
-            elif sender != status[uid]:
-                await bot.send(ev, "该账号不由您代刀", at_sender=True)
+            uid = str(m.data['qq'])
+            curLoggedin = status.loginStatus(con, uid)
+            if curLoggedin is None:
+                await bot.send(ev, '该账号没有代刀', at_sender=True)
+            elif curLoggedin != sender:
+                await bot.send(ev, '该账号不由您代刀', at_sender=True)
             else:
-                del status[uid]
-                await bot.send(ev, "已记录下号，请及时回到登录界面并删除登录记录，防止重开游戏自动登录原账号", at_sender=True)
+                status.logout(con, uid)
+                await bot.send(ev, '已记录下号，请及时回到登录界面并删除登录记录，防止重开游戏自动登录原账号', at_sender=True)
+    con.close()
 
 @sv.on_fullmatch('我的代刀')
 async def daidaoQuerySender(bot, ev: CQEvent):
-    sender = int(ev.user_id)
-    people = []
+    con = status.connect(str(ev.group_id))
+    sender = str(ev.user_id)
+    records = status.getCurStatus(con, sender)
+    con.close()
     
-    for p in status:
-        if status[p] == sender:
-            people.append(p)
-    
-    if len(people) == 0:
-        await bot.send(ev, "您当前没有代刀", at_sender = True)
+    if records == []:
+        await bot.send(ev, '您当前没有代刀', at_sender = True)
     else:
         msg = "您负责的代刀："
-        for p in people:
+        for _, p in records:
             at = str(MessageSegment.at(p))
-            msg += f'\n{at}'
+            msg += '\n{}'.format(at)
         await bot.send(ev, msg, at_sender = True)
 
 @sv.on_fullmatch('所有代刀')
 async def daidaoQueryAll(bot, ev: CQEvent):
+    con = status.connect(str(ev.group_id))
     msgs = []
-    for uid in status:
-        at1= str(MessageSegment.at(status[uid]))
-        at2= str(MessageSegment.at(uid))
-        msg = f'{at1}代{at2}'
+    for u1, u2 in status.getCurStatus(con):
+        at1= str(MessageSegment.at(u1))
+        at2= str(MessageSegment.at(u2))
+        msg = '{}代{}'.format(at1, at2)
         msgs.append(msg)
-    print(msgs)
-    if len(msgs) == 0:
-        await bot.send(ev, "当前没有代刀记录")
+    con.close()
+    #print(msgs)
+    if msgs == []:
+        await bot.send(ev, '当前没有代刀记录')
     else:
         step = 10
         temp = [msgs[i:i+step] for i in range(0, len(msgs), step)]
@@ -100,181 +103,124 @@ async def daidaoQueryAll(bot, ev: CQEvent):
 
 @sv.on_fullmatch('清除代刀')
 async def daidaoDelSender(bot, ev: CQEvent):
-    sender = int(ev.user_id)
-    to_be_del = []
+    con = status.connect(str(ev.group_id))
+    sender = str(ev.user_id)
     
-    for p in status:
-        if status[p] == sender:
-            to_be_del.append(p)
-    
-    if len(to_be_del) == 0:
-        await bot.send(ev, "您当前没有代刀")
+    records = status.getCurStatus(con, sender)
+    if records == []:
+        await bot.send(ev, '您当前没有代刀')
     else:
-        msg = "请确认所有账号均已登出（回到登录界面并删除登录记录）\n已清除代刀的账号："
-        for p in to_be_del:
-            del status[p]
+        status.logoutAll(con, sender)
+        msg = '请确认所有账号均已登出（回到登录界面并删除登录记录）\n已清除代刀的账号：'
+        for _, p in records:
             at = str(MessageSegment.at(p))
-            msg += f'\n{at}'
+            msg += '\n{}'.format(at)
         await bot.send(ev, msg, at_sender = True)
+    con.close()
 
 @sv.on_prefix('删除代刀')
 async def daidaodelete(bot, ev: CQEvent):
     u_priv = priv.get_user_priv(ev)
+    con = status.connect(str(ev.group_id))
     daoshou = []
-    to_be_del = []
+    records = []
     
     for m in ev.message:
         if m.type == 'at' and m.data['qq'] != 'all':
-            uid = int(m.data['qq'])
+            uid = str(m.data['qq'])
             daoshou.append(uid)
     
     if len(daoshou) != 1:
-        await bot.send(ev, "请@一名刀手（仅一名）")
+        await bot.send(ev, '请@一名刀手（仅一名）')
     elif u_priv < priv.ADMIN:
-        await bot.send(ev, "权限不足")
+        await bot.send(ev, '权限不足')
     else:
-        for p in status:
-            if status[p] == daoshou[0]:
-                to_be_del.append(p)
+        records = status.getCurStatus(con, daoshou[0])
         
-        if len(to_be_del) == 0:
-            await bot.send(ev, "该刀手没有代刀")
+        if records == []:
+            await bot.send(ev, '该刀手没有代刀')
         else:
+            status.logoutAll(con, daoshou[0])
             at = str(MessageSegment.at(daoshou[0]))
-            msg = f'已删除{at}的代刀记录：'
-            for p in to_be_del:
-                del status[p]
+            msg = '已删除{}的代刀记录：'.format(at)
+            for _, p in records:
                 at = str(MessageSegment.at(p))
-                msg += f'\n{at}'
+                msg += '\n{}'.format(at)
             await bot.send(ev, msg)
+    con.close()
 
 @sv.on_fullmatch('重置代刀')
 async def daidaoclear(bot, ev: CQEvent):
     u_priv = priv.get_user_priv(ev)
     if u_priv < priv.ADMIN:
-        await bot.send(ev, "权限不足")
+        await bot.send(ev, '权限不足')
         return
     
-    global status
-    status = {}
-    await bot.send(ev, "已重置代刀记录")
+    con = status.connect(str(ev.group_id))
+    status.clearStatus(con)
+    con.close()
+    await bot.send(ev, '已重置代刀记录')
 
-@sv.on_fullmatch('下树')
-async def xiashuHelp(bot, ev: CQEvent):
-    helpMessage = '''请按以下格式发送下树指令：
-下树[1-5] [通知所有人某Boss可以下树 | 需管理权限]
-下树？    [查询最近的下树通知]
-重置下树  [取消下树通知]
-'''
-    await bot.send(ev, helpMessage)
+@sv.on_prefix('代刀次数')
+async def daidaoCount(bot, ev: CQEvent):
+    request = ev.raw_message.split(']')[-1].replace('：', ':').replace(' ', '').split(':')[1:]
+    if len(request) != 2:
+        await bot.send(ev, '请按照正确格式发送请求\n代刀次数(@User): yy-mm-dd: h+d')
+        return None
+    
+    try:
+        hours = request[1].split('+')
+        dt1 = datetime.strptime('{}-{}'.format(request[0], hours[0]), '%y-%m-%d-%H')
+        dt2 = dt1 + timedelta(hours = int(hours[1]))
+        t1 = dt1.strftime('%y-%m-%d %H:%M')
+        t2 = dt2.strftime('%y-%m-%d %H:%M')
+    except:
+        await bot.send(ev, '请按照正确格式发送请求\n代刀次数(@User): yy-mm-dd: h+d')
+        return None
+    
+    con = status.connect(str(ev.group_id))
+    checkSelf = True
+    
+    for m in ev.message:
+        if m.type == 'at' and m.data['qq'] != 'all':
+            checkSelf = False
+            uid = str(m.data['qq'])
+            count = status.getDaidaoCount(con, uid, dt1, dt2)
+            at = str(MessageSegment.at(uid))
+            msg = '{}在{}到{}之间的上号次数为：{}次'.format(at, t1, t2, count)
+            await bot.send(ev, msg)
+    
+    if checkSelf:
+        uid = str(ev.user_id)
+        count = status.getDaidaoCount(con, uid, dt1, dt2)
+        at = str(MessageSegment.at(uid))
+        msg = '{}在{}到{}之间的上号次数为：{}次'.format(at, t1, t2, count)
+        await bot.send(ev, msg)
+    
+    con.close()
 
-@sv.on_fullmatch('下树1')
-async def xiashu1(bot, ev: CQEvent):
+@sv.on_prefix('删除历史')
+async def clearHistory(bot, ev: CQEvent):
     u_priv = priv.get_user_priv(ev)
     if u_priv < priv.ADMIN:
-        await bot.send(ev, "权限不足")
+        await bot.send(ev, '权限不足')
         return
     
-    global xiashu_boss
-    xiashu_boss = 1
-    global xiashu_time
-    xiashu_time = datetime.now().strftime("%m/%d %I:%M%p")
+    request = ev.raw_message.replace('：', ':').replace(' ', '').split(':')
+    if len(request) != 2:
+        await bot.send(ev, '请按照正确格式发送请求\n删除历史: yy-mm-dd')
+        return None
     
-    msg = '''************
-**1王下树**
-************'''
+    try:
+        dt = datetime.strptime(request[1], '%y-%m-%d')
+        t = dt.strftime('%y-%m-%d')
+    except:
+        await bot.send(ev, '请按照正确格式发送请求\n删除历史: yy-mm-dd')
+        return None
+    
+    con = status.connect(str(ev.group_id))
+    status.deleteHistory(con, dt)
+    con.close()
+    
+    msg = '已删除直到{}为止的代刀记录'.format(t)
     await bot.send(ev, msg)
-
-@sv.on_fullmatch('下树2')
-async def xiashu2(bot, ev: CQEvent):
-    u_priv = priv.get_user_priv(ev)
-    if u_priv < priv.ADMIN:
-        await bot.send(ev, "权限不足")
-        return
-    
-    global xiashu_boss
-    xiashu_boss = 2
-    global xiashu_time
-    xiashu_time = datetime.now().strftime("%m/%d %I:%M%p")
-    
-    msg = '''************
-**2王下树**
-************'''
-    await bot.send(ev, msg)
-
-@sv.on_fullmatch('下树3')
-async def xiashu3(bot, ev: CQEvent):
-    u_priv = priv.get_user_priv(ev)
-    if u_priv < priv.ADMIN:
-        await bot.send(ev, "权限不足")
-        return
-    
-    global xiashu_boss
-    xiashu_boss = 3
-    global xiashu_time
-    xiashu_time = datetime.now().strftime("%m/%d %I:%M%p")
-    
-    msg = '''************
-**3王下树**
-************'''
-    await bot.send(ev, msg)
-
-@sv.on_fullmatch('下树4')
-async def xiashu4(bot, ev: CQEvent):
-    u_priv = priv.get_user_priv(ev)
-    if u_priv < priv.ADMIN:
-        await bot.send(ev, "权限不足")
-        return
-    
-    global xiashu_boss
-    xiashu_boss = 4
-    global xiashu_time
-    xiashu_time = datetime.now().strftime("%m/%d %I:%M%p")
-    
-    msg = '''************
-**4王下树**
-************'''
-    await bot.send(ev, msg)
-
-@sv.on_fullmatch('下树5')
-async def xiashu5(bot, ev: CQEvent):
-    u_priv = priv.get_user_priv(ev)
-    if u_priv < priv.ADMIN:
-        await bot.send(ev, "权限不足")
-        return
-    
-    global xiashu_boss
-    xiashu_boss = 5
-    global xiashu_time
-    xiashu_time = datetime.now().strftime("%m/%d %I:%M%p")
-    
-    msg = '''************
-**5王下树**
-************'''
-    await bot.send(ev, msg)
-
-@sv.on_fullmatch('下树？')
-@sv.on_fullmatch('下树?')
-async def xiashuCheck(bot, ev: CQEvent):
-    msg = ""
-    
-    if xiashu_boss == 0:
-        msg = "无下树通知记录"
-    else:
-        msg = "最近的下树通知为：{}王\n通知时间：{}".format(xiashu_boss, xiashu_time)
-    
-    await bot.send(ev, msg)
-
-@sv.on_fullmatch('重置下树')
-async def xiashuClear(bot, ev: CQEvent):
-    u_priv = priv.get_user_priv(ev)
-    if u_priv < priv.ADMIN:
-        await bot.send(ev, "权限不足")
-        return
-    
-    global xiashu_boss
-    xiashu_boss = 0
-    global xiashu_time
-    xiashu_time = ""
-    
-    await bot.send(ev, "下树通知/记录已清除")
